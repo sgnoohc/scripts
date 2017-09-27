@@ -4,4 +4,5 @@ git clone git@github.com:sgnoohc/WWW_CORE.git
 git clone git@github.com:sgnoohc/rooutil.git
 git clone git@github.com:sgnoohc/scanchains.git
 git clone git@github.com:sgnoohc/scripts.git
+git clone git@github.com:aminnj/plottery.git
 source scripts/setup.sh
