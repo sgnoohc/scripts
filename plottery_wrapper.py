@@ -312,6 +312,8 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
         hsyst = None
     # Setting maximums
     totalbkg = getTotalBkgHist(hbgs)
+    totalbkg.Print("all")
+    hsigs[0].Print("all")
     yaxismax = getMaxYaxisRange([hdata, totalbkg]) * 1.8
     removeErrors(hbgs)
     if yaxismax < 100:

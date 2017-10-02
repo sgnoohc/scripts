@@ -185,6 +185,7 @@ def drawbytype(histname, options={}):
             colors.append(bkg_colors[key])
         if bkg_categs[key] == "sig"  and hists[key]:
             v_sig_hists.append(hists[key])
+            hists[key].Print("all")
         if bkg_categs[key] == "data" and hists[key]:
             hists[key].SetLineColor( 1 )
             data_hist = hists[key]
@@ -193,5 +194,6 @@ def drawbytype(histname, options={}):
 if __name__ == "__main__":
 
     drawbytype("MjjSBPRVRSSPred_counter", options={"output_name" : "MjjSBPRVRSSPred_counter.pdf",})
+    drawbytype("MjjSBVRSSPred_counter", options={"output_name" : "MjjSBVRSSPred_counter.pdf",})
     drawbytype("MjjSBPRVRSSMMPred_met", options={"output_name" : "MjjSBPRVRSSMMPred_met.pdf", "nbin" : 15, "ratio_xaxis_title" : "MET [GeV]", "ratio_range" : [0., 3.]})
-    drawbytype("MjjSBPRVRSSMMPred_met", options={"output_name" : "MjjSBPRVRSSMMPred_met.pdf", "nbin" : 15, "ratio_xaxis_title" : "MET [GeV]", "ratio_range" : [0., 3.]})
+    drawbytype("SSPred_counter", options={"output_name" : "SSPred_counter.pdf",})

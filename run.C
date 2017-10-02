@@ -1,8 +1,10 @@
-void run( TString scanchainname, const char* input_path, TString treename, TString output_path, TString nevents = "-1", TString compilerflag = "" )
+void run( TString scanchainname, const char* input_path, TString treename, TString output_path, TString nevents = "-1", TString compilerflag = "", TString opt = "" )
 {
 
     // Load all *.so files in current directory
     TString analysis_base = gSystem->Getenv("ANALYSIS_BASE");
+    if ( analysis_base.IsNull() )
+        analysis_base = "./";
     std::cout << "Checking packages in the directory " << analysis_base << std::endl;
     TSystemDirectory dir( analysis_base, analysis_base );
     TList *files = dir.GetListOfFiles();
@@ -42,6 +44,7 @@ void run( TString scanchainname, const char* input_path, TString treename, TStri
     gROOT->ProcessLine( Form( "TString input_path = \"%s\";", input_path ) );
     gROOT->ProcessLine( "TString output_path = \"" + output_path + "\";" );
     gROOT->ProcessLine( "TString ttreename = \"" + treename + "\";" );
+    gROOT->ProcessLine( "TString opt = \"" + opt + "\";" );
     gROOT->ProcessLine( "TChain *chain = new TChain(ttreename);" );
     gROOT->ProcessLine( "TObjArray* files = input_path.Tokenize(\",\");" );
     gROOT->ProcessLine( "for (unsigned int ifile = 0; ifile < files->GetEntries(); ++ifile) { TString filepath = ((TObjString*) files->At(ifile))->GetString(); std::cout << \"Adding to TChain: file = \" << filepath << std::endl; chain->Add(filepath); }" );
@@ -49,7 +52,7 @@ void run( TString scanchainname, const char* input_path, TString treename, TStri
     gROOT->ProcessLine( "TString sample_name = TString(gSystem->BaseName(gSystem->DirName(gSystem->DirName(chain->GetListOfFiles()->At(0)->GetTitle()))));");//.ReplaceAll(\"/\",\"_\").ReplaceAll(\"-\",\"_\");" );
     gROOT->ProcessLine( "TString file_name   = TString(gSystem->BaseName(gSystem->BaseName(chain->GetListOfFiles()->At(0)->GetTitle())));");//.ReplaceAll(\"/\",\"_\").ReplaceAll(\"-\",\"_\");" );
 //    gROOT->ProcessLine( "TString sample_name_based_opt_string = sample_name + \"_\" + CMSxVersion + \"_\" + file_name;");//.ReplaceAll(\"/\",\"_\").ReplaceAll(\"-\",\"_\");" );
-    gROOT->ProcessLine( "TString sample_name_based_opt_string = input_path" );
+    gROOT->ProcessLine( "TString sample_name_based_opt_string = input_path + opt" );
     gROOT->ProcessLine( "std::cout << \"base_optstr = \" << sample_name_based_opt_string << std::endl;" );
     gROOT->ProcessLine( "std::cout << std::endl;" );
     gROOT->ProcessLine( "std::cout << std::endl;" );

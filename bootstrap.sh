@@ -5,4 +5,5 @@ git clone git@github.com:sgnoohc/rooutil.git
 git clone git@github.com:sgnoohc/scanchains.git
 git clone git@github.com:sgnoohc/scripts.git
 git clone git@github.com:aminnj/plottery.git
+git clone git@github.com:cmstas/LeptonBabyMaker.git
 source scripts/setup.sh

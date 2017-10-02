@@ -76,7 +76,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 usage()
 {
-    echo "Usage: sh $(basename $0) [-p] [-g] [-c] scanchain output.root t nevents cms3_1,cms3_2.root"
+    echo "Usage: sh $(basename $0) [-p] [-g] [-c] scanchain output.root t nevents extraopt cms3_1,cms3_2.root"
     echo ""
     echo "  -g option runs in gdb"
     echo "  -c option forces recompilation"
@@ -98,21 +98,21 @@ done
 # to shift away the parsed options
 shift $(($OPTIND - 1))
 
-# Default arguments
-NEVENTS=-1
-
 # Parse arguments
 if [ -z "$1" ]; then usage; fi
 if [ -z "$2" ]; then usage; fi
 if [ -z "$3" ]; then usage; fi
+if [ -z "$4" ]; then usage; fi
+if [ -z "$5" ]; then usage; fi
 SCANCHAINNAME=$1
 OUTPUTROOTNAME=$2
 INPUTTTREENAME=$3
-if [ -n "$4" ]; then NEVENTS=$4; fi
+NEVENTS=$4
+EXTRAOPT=$5
 
 # Parse the input file names differently depending on whether it's condor job or local job.
 if [ "x${_CONDOR_JOB_AD}" == "x" ]; then
-    if [ -n "$5" ]; then INPUTFILENAMES=$5; fi
+    if [ -n "$6" ]; then INPUTFILENAMES=$6; fi
 else
     # If condor jobs, touch the .so files to prevent from recompiling
     touch *.so
@@ -129,19 +129,20 @@ echo "SCANCHAINNAME  = $SCANCHAINNAME"
 echo "OUTPUTROOTNAME = $OUTPUTROOTNAME"
 echo "INPUTTTREENAME = $INPUTTTREENAME"
 echo "NEVENTS        = $NEVENTS"
+echo "EXTRAOPT       = $EXTRAOPT"
 echo "INPUTFILENAMES = $INPUTFILENAMES"
 echo "==============================================================================="
 
 # Run the job!
 if [ "${DEBUG}" == true ]; then
     COMPILERFLAG=+g
-    gdb --args root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'")'
+    gdb --args root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
 else
     if [ "${PERF}" == true ]; then
         COMPILERFLAG=+g
-        root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'1'", "'${COMPILERFLAG}'")'
+        root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'1'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
         COMPILERFLAG=g
-        igprof -pp -d -z -o igprof.pp.gz root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'")'
+        igprof -pp -d -z -o igprof.pp.gz root.exe -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
         igprof-analyse --sqlite -d -v -g igprof.pp.gz | sqlite3 igprof.pp.sql3 >& /dev/null
         cp igprof.pp.sql3 ~/public_html/cgi-bin/data/
         echo "http://${HOSTNAME}/~phchang/cgi-bin/igprof-navigator.py/igprof.pp/"
@@ -152,8 +153,8 @@ else
         else
            touch ${SCANCHAINNAME%.*}_C.so
         fi
-        echo root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'")'
-        time root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'")'
+        echo root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
+        time root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
     fi
 fi
 
