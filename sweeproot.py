@@ -38,11 +38,12 @@ try:
             foundBad = True
             print "[RSR] found bad event %i" % i
             break
-except:
+except Exception, e:
+    print "ERROR - ", str(e)
     foundBad = True
 
 if foundBad:
-    print "[RSR] removing output file because it does not deserve to live"
-    os.system("rm %s" % args.filepath)
+    print "[RSR] removing file because it does not deserve to live: {}".format(args.filepath)
+    #os.system("rm %s" % args.filepath)
 else:
     print "[RSR] passed the rigorous sweeproot"
