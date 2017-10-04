@@ -20,7 +20,7 @@ void run( TString scanchainname, const char* input_path, TString treename, TStri
         {
             fname = file->GetName();
 
-            if ( file->IsDirectory() && ( fname.EndsWith( "CORE" ) || fname.EqualTo( "rooutil" ) ) )
+            if ( file->IsDirectory() && ( fname.Contains( "CORE" ) || fname.EqualTo( "rooutil" ) ) )
             {
                 if ( fname.EqualTo( "CORE" ) )
                 {
