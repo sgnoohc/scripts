@@ -9,4 +9,7 @@ git clone git@github.com:sgnoohc/scanchains.git
 git clone git@github.com:sgnoohc/scripts.git
 git clone git@github.com:sgnoohc/FakeRate.git
 git clone git@github.com:sam-may/MLP.git
+cd ProjectMetis/
+git clone git@github.com:sgnoohc/mymetis.git
+cd ../
 source scripts/setup.sh

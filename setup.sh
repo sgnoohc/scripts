@@ -14,8 +14,12 @@ export PYTHONPATH=$ANALYSIS_BASE:$PYTHONPATH
 export PYTHONPATH=$DIR:$PYTHONPATH
 export ROOT_INCLUDE_PATH=$ANALYSIS_BASE:$ROOT_INCLUDE_PATH
 
-pushd $DIR
+pushd $DIR > /dev/null
 source ./root.sh
-cd ../ProjectMetis/
-source ./setup.sh
-popd
+if [ -d $ANALYSIS_BASE/ProjectMetis/ ]; then
+    cd $ANALYSIS_BASE/ProjectMetis/
+    source ./setup.sh
+else
+    echo "NOTE: ProjectMetis was not found. You may want to set this up yourself."
+fi
+popd > /dev/null

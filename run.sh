@@ -156,6 +156,11 @@ else
         fi
         echo root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
         time root -l -b -q $DIR/'run.C("'${SCANCHAINNAME}'","'${INPUTFILENAMES}'","'${INPUTTTREENAME}'","'${OUTPUTROOTNAME}'","'${NEVENTS}'", "'${COMPILERFLAG}'", "'${EXTRAOPT}'")'
+        if [ $? -eq 0 ]; then
+            echo "Job Success"
+        else
+            echo "Job Failed"
+        fi
     fi
 fi
 
