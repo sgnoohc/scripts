@@ -49,6 +49,7 @@ The general assumed structure are like the following:
         ...
 
 See [this WWW analysis code](https://github.com/sgnoohc/www) as an example.
+In particular note the ```bootstrap.sh``` in that package.
 
 Once you have setup like this, you setup your ```scripts/``` like
 
