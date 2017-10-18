@@ -1,7 +1,7 @@
 # scripts
 
-This directory contains various scripts to perform analysis tasks.
-The general assumed structure are like the following
+This directory contains various scripts to perform analysis tasks.  
+The general assumed structure are like the following:  
 
     CORE/
         .git/
