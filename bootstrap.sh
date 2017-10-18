@@ -7,4 +7,6 @@ git clone git@github.com:sgnoohc/rooutil.git; cd rooutil/; make -j 20; cd ../
 git clone git@github.com:sgnoohc/COREHelper.git; cd COREHelper/; make -j 20; cd ../
 git clone git@github.com:sgnoohc/scanchains.git
 git clone git@github.com:sgnoohc/scripts.git
+git clone git@github.com:sgnoohc/FakeRate.git
+git clone git@github.com:sam-may/MLP.git
 source scripts/setup.sh

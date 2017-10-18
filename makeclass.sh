@@ -29,7 +29,7 @@ usage(){
     echo ""
     echo "Usage:"
     echo ""
-    echo ${green}"  > sh $(basename $0) [-h] [-x] ROOTFILE TTREENAME CLASSNAME [NAMESPACENAME=tas] [CLASSINSTANCENAME=mytree] "${reset}
+    echo ${green}"  > sh $(basename $0) [-f] [-h] [-x] ROOTFILE TTREENAME CLASSNAME [NAMESPACENAME=tas] [CLASSINSTANCENAME=mytree] "${reset}
     echo ""
     echo ""
     echo ${green}" -h ${reset}: print this message"

@@ -98,6 +98,10 @@ def cloneTH1(obj, name=""):
     if not rtn.GetSumw2N():
         rtn.Sumw2()
     rtn.SetDirectory(0)
+    # https://root-forum.cern.ch/t/setbinlabel-causes-unexpected-behavior-when-handling-the-histograms/26202/2
+    labels = rtn.GetXaxis().GetLabels()
+    if labels:
+        rtn.GetXaxis().SetRange(1, rtn.GetXaxis().GetNbins())
     return rtn;
 
 def getTotalErrByMaxDiff(nom, systs):
@@ -197,7 +201,7 @@ def makeHistDataFromTH2(th2, dosyst=True, options={}):
     if not th2:
         return HistData()
     hist = HistData()
-    for ibin in xrange(1, th2.GetNbinsY() + 1):
+    for ibin in xrange(1, th2.GetYaxis().GetNbins() + 1):
         if not dosyst:
             if ibin > 1:
                 break
@@ -284,17 +288,7 @@ def removeErrors(hists):
         for ibin in xrange(0, hist.GetNbinsX()+2):
             hist.SetBinError(ibin, 0)
 
-def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], legend_labels=[]):
-    """
-    Plot 1d plot based off of th2s
-    bkg histograms and a single combined total error histograms.
-    Some operations are additionally done.
-    """
-    hdata = makeHistDataFromTH2(th2_data, False, options=options).nom
-    hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
-    hsigs, hsigerrs = makeHistDatasFromTH2s(th2s_sig, options=options)
-    # Rebinning occurs during "makeHist" delete the option afterwards
-    if "nbin" in options: del options["nbin"]
+def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], legend_labels=[]):
     hsig_labels = []
     if len(sig_labels) == 0:
         for hsig in hsigs:
@@ -308,15 +302,25 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
         for hbg in hbgs:
             hlegend_labels.append(hbg.GetName())
     # If hsyst has integral of 0 remove it
-    if hsyst.Integral() == 0:
-        hsyst = None
+    if hsyst:
+        if hsyst.Integral() == 0:
+            hsyst = None
     # Setting maximums
     totalbkg = getTotalBkgHist(hbgs)
-    totalbkg.Print("all")
-    hsigs[0].Print("all")
+    #totalbkg.Print("all")
+    #if len(hsigs) > 0:
+    #    hsigs[0].Print("all")
+    #for hbg in hbgs:
+    #    hbg.Print("all")
     yaxismax = getMaxYaxisRange([hdata, totalbkg]) * 1.8
     removeErrors(hbgs)
-    if yaxismax < 100:
+    if yaxismax < 0.01:
+        options["yaxis_title_offset"] = 1.8
+    elif yaxismax < 0.1:
+        options["yaxis_title_offset"] = 1.6
+    elif yaxismax < 1.:
+        options["yaxis_title_offset"] = 1.5
+    elif yaxismax < 100:
         options["yaxis_title_offset"] = 1.2
     elif yaxismax < 1000:
         options["yaxis_title_offset"] = 1.45
@@ -379,4 +383,113 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
             legend_labels = hlegend_labels,
             options       = options
             )
+
+def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], legend_labels=[]):
+    """
+    Plot 1d plot based off of th2s
+    bkg histograms and a single combined total error histograms.
+    Some operations are additionally done.
+    """
+    hdata_histdata = makeHistDataFromTH2(th2_data, True, options=options)
+    hdata = hdata_histdata.nom
+    hdataerr = hdata_histdata.totalerr
+    hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
+    hdataerr.Print("all")
+    hsyst.Print("all")
+    hsyst = getTotalErrBySqSum(None, [hdataerr, hsyst])
+    hsyst.Print("all")
+    hsigs = []
+    hsigerrs = []
+    if len(th2s_sig) > 0:
+        hsigs, hsigerrs = makeHistDatasFromTH2s(th2s_sig, options=options)
+    # Rebinning occurs during "makeHist" delete the option afterwards
+    if "nbin" in options: del options["nbin"]
+    plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors, sig_labels, legend_labels)
+    #hsig_labels = []
+    #if len(sig_labels) == 0:
+    #    for hsig in hsigs:
+    #        hsig_labels.append(hsig.GetName())
+    #hcolors = colors
+    #if len(colors) == 0:
+    #    for index, hbg in enumerate(hbgs):
+    #        hcolors.append(2001 + index)
+    #hlegend_labels = []
+    #if len(legend_labels) == 0:
+    #    for hbg in hbgs:
+    #        hlegend_labels.append(hbg.GetName())
+    ## If hsyst has integral of 0 remove it
+    #if hsyst.Integral() == 0:
+    #    hsyst = None
+    ## Setting maximums
+    #totalbkg = getTotalBkgHist(hbgs)
+    ##totalbkg.Print("all")
+    ##if len(hsigs) > 0:
+    ##    hsigs[0].Print("all")
+    ##for hbg in hbgs:
+    ##    hbg.Print("all")
+    #yaxismax = getMaxYaxisRange([hdata, totalbkg]) * 1.8
+    #removeErrors(hbgs)
+    #if yaxismax < 100:
+    #    options["yaxis_title_offset"] = 1.2
+    #elif yaxismax < 1000:
+    #    options["yaxis_title_offset"] = 1.45
+    #elif yaxismax < 10000:
+    #    options["yaxis_title_offset"] = 1.6
+    #else:
+    #    options["yaxis_title_offset"] = 1.8
+    #if not "canvas_width"             in options: options["canvas_width"]              = 604
+    #if not "canvas_height"            in options: options["canvas_height"]             = 728
+    #if not "yaxis_range"              in options: options["yaxis_range"]               = [0., yaxismax]
+    #if not "legend_ncolumns"          in options: options["legend_ncolumns"]           = 2
+    #if not "legend_alignment"         in options: options["legend_alignment"]          = "topright"
+    #if not "legend_smart"             in options: options["legend_smart"]              = True
+    #if not "legend_scalex"            in options: options["legend_scalex"]             = 1.4
+    #if not "legend_scaley"            in options: options["legend_scaley"]             = 1.4
+    #if not "legend_border"            in options: options["legend_border"]             = False
+    #if not "legend_percentageinbox"   in options: options["legend_percentageinbox"]    = False
+    #if not "hist_line_none"           in options: options["hist_line_none"]            = True
+    #if not "show_bkg_errors"          in options: options["show_bkg_errors"]           = False
+    #if not "ratio_range"              in options: options["ratio_range"]               = [0.7, 1.3]
+    #if not "ratio_name_size"          in options: options["ratio_name_size"]           = 0.13
+    #if not "ratio_name_offset"        in options: options["ratio_name_offset"]         = 0.6
+    #if not "ratio_xaxis_label_offset" in options: options["ratio_xaxis_label_offset"]  = 0.06
+    #if not "ratio_yaxis_label_offset" in options: options["ratio_yaxis_label_offset"]  = 0.03
+    #if not "ratio_xaxis_title_offset" in options: options["ratio_xaxis_title_offset"]  = 1.40
+    #if not "ratio_xaxis_title_size"   in options: options["ratio_xaxis_title_size"]    = 0.13
+    #if not "ratio_label_size"         in options: options["ratio_label_size"]          = 0.13
+    #if not "canvas_tick_one_side"     in options: options["canvas_tick_one_side"]      = True
+    #if not "canvas_main_y1"           in options: options["canvas_main_y1"]            = 0.2
+    #if not "canvas_main_topmargin"    in options: options["canvas_main_topmargin"]     = 0.2 / 0.7 - 0.2
+    #if not "canvas_main_rightmargin"  in options: options["canvas_main_rightmargin"]   = 50. / 600.
+    #if not "canvas_main_bottommargin" in options: options["canvas_main_bottommargin"]  = 0.2
+    #if not "canvas_main_leftmargin"   in options: options["canvas_main_leftmargin"]    = 130. / 600.
+    #if not "canvas_ratio_y2"          in options: options["canvas_ratio_y2"]           = 0.342
+    #if not "canvas_ratio_topmargin"   in options: options["canvas_ratio_topmargin"]    = 0.05
+    #if not "canvas_ratio_rightmargin" in options: options["canvas_ratio_rightmargin"]  = 50. / 600.
+    #if not "canvas_ratio_bottommargin"in options: options["canvas_ratio_bottommargin"] = 0.4
+    #if not "canvas_ratio_leftmargin"  in options: options["canvas_ratio_leftmargin"]   = 130. / 600.
+    #if not "xaxis_title_size"         in options: options["xaxis_title_size"]          = 0.06
+    #if not "yaxis_title_size"         in options: options["yaxis_title_size"]          = 0.06
+    #if not "xaxis_label_size_scale"   in options: options["xaxis_label_size_scale"]    = 1.4
+    #if not "yaxis_label_size_scale"   in options: options["yaxis_label_size_scale"]    = 1.4
+    #if not "xaxis_label_offset_scale" in options: options["xaxis_label_offset_scale"]  = 4.0
+    #if not "yaxis_label_offset_scale" in options: options["yaxis_label_offset_scale"]  = 4.0
+    #if not "xaxis_tick_length_scale"  in options: options["xaxis_tick_length_scale"]   = -0.8
+    #if not "yaxis_tick_length_scale"  in options: options["yaxis_tick_length_scale"]   = -0.8
+    #if not "ratio_tick_length_scale"  in options: options["ratio_tick_length_scale"]   = -1.0
+    #if not "output_name"              in options: options["output_name"]               = "plot.png"
+    #if not "cms_label"                in options: options["cms_label"]                 = "Preliminary"
+    #if not "lumi_value"               in options: options["lumi_value"]                = "35.9"
+    #if not "bkg_err_fill_style"       in options: options["bkg_err_fill_style"]        = 3245
+    #if not "bkg_err_fill_color"       in options: options["bkg_err_fill_color"]        = 1
+    #p.plot_hist(
+    #        data          = hdata,
+    #        bgs           = hbgs,
+    #        sigs          = hsigs,
+    #        syst          = hsyst,
+    #        sig_labels    = hsig_labels,
+    #        colors        = hcolors,
+    #        legend_labels = hlegend_labels,
+    #        options       = options
+    #        )
 

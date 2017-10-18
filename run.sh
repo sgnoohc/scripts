@@ -131,6 +131,7 @@ echo "INPUTTTREENAME = $INPUTTTREENAME"
 echo "NEVENTS        = $NEVENTS"
 echo "EXTRAOPT       = $EXTRAOPT"
 echo "INPUTFILENAMES = $INPUTFILENAMES"
+echo "FORCERECOMPILE = $FORCERECOMPILE"
 echo "==============================================================================="
 
 # Run the job!
