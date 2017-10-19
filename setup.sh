@@ -11,6 +11,7 @@ fi
 export ANALYSIS_BASE=$(dirname $DIR)
 export PATH=$DIR:$PATH
 export PATH=$DIR/syncfiles/pyfiles:$PATH
+export PATH=$DIR/syncfiles/miscfiles:$PATH
 export PYTHONPATH=$ANALYSIS_BASE:$PYTHONPATH
 export PYTHONPATH=$DIR:$PYTHONPATH
 export ROOT_INCLUDE_PATH=$ANALYSIS_BASE:$ROOT_INCLUDE_PATH
