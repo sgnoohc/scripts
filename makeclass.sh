@@ -29,12 +29,13 @@ usage(){
     echo ""
     echo "Usage:"
     echo ""
-    echo ${green}"  > sh $(basename $0) [-f] [-h] [-x] ROOTFILE TTREENAME CLASSNAME [NAMESPACENAME=tas] [CLASSINSTANCENAME=mytree] "${reset}
+    echo ${green}"  > sh $(basename $0) [-f] [-h] [-x] [-p] ROOTFILE TTREENAME CLASSNAME [NAMESPACENAME=tas] [CLASSINSTANCENAME=mytree] "${reset}
     echo ""
     echo ""
     echo ${green}" -h ${reset}: print this message"
     echo ${green}" -f ${reset}: force run this script"
     echo ${green}" -x ${reset}: create additional looper template files (i.e. ScanChain.C, doAll.C, compile.sh, run.sh, submit_batch.sh)"
+    echo ${green}" -p ${reset}: use the python version of the makeclass script"
     echo ""
     echo ${green}" ROOTFILE          ${reset}= Path to the root file that holds an example TTree that you wish to study."
     echo ${green}" TREENAME          ${reset}= The TTree object TKey name in the ROOTFILE"
@@ -51,10 +52,11 @@ usage(){
 }
 
 # Command-line opts
-while getopts ":fxh" OPTION; do
+while getopts ":fxph" OPTION; do
   case $OPTION in
     f) FORCE=true;;
     x) GENERATEEXTRACODE=true;;
+    p) USEPYTHON=true;;
     h) usage;;
     :) usage;;
   esac
@@ -124,10 +126,18 @@ fi
 source $DIR/root.sh ""
 
 if [ -e ~/cmstas/Software/makeCMS3ClassFiles/makeCMS3ClassFiles.C ]; then
-  root -l -b -q ~/cmstas/Software/makeCMS3ClassFiles/makeCMS3ClassFiles.C\(\"${ROOTFILE}\",\"${TTREENAME}\",\"${MAKECLASSNAME}\",\"${NAMESPACENAME}\",\"${TREEINSTANCENAME}\"\) &> /dev/null
+    if [ "${USEPYTHON}" == true ]; then
+        python $DIR/syncfiles/pyfiles/make_classfiles.py -t ${TTREENAME} -n ${NAMESPACENAME} -o ${TREEINSTANCENAME} -c ${MAKECLASSNAME} ${ROOTFILE}
+    else
+        root -l -b -q ~/cmstas/Software/makeCMS3ClassFiles/makeCMS3ClassFiles.C\(\"${ROOTFILE}\",\"${TTREENAME}\",\"${MAKECLASSNAME}\",\"${NAMESPACENAME}\",\"${TREEINSTANCENAME}\"\) &> /dev/null
+    fi
 else
   git clone git@github.com:cmstas/Software.git
-  root -l -b -q Software/makeCMS3ClassFiles/makeCMS3ClassFiles.C\(\"${ROOTFILE}\",\"${TTREENAME}\",\"${MAKECLASSNAME}\",\"${NAMESPACENAME}\",\"${TREEINSTANCENAME}\"\) &> /dev/null
+  if [ "${USEPYTHON}" == true ]; then
+      python $DIR/syncfiles/pyfiles/make_classfiles.py -t ${TTREENAME} -n ${NAMESPACENAME} -o ${TREEINSTANCENAME} -c ${MAKECLASSNAME} ${ROOTFILE} &> /dev/null
+  else
+      root -l -b -q Software/makeCMS3ClassFiles/makeCMS3ClassFiles.C\(\"${ROOTFILE}\",\"${TTREENAME}\",\"${MAKECLASSNAME}\",\"${NAMESPACENAME}\",\"${TREEINSTANCENAME}\"\) &> /dev/null
+  fi
   rm -rf Software
 fi
 
