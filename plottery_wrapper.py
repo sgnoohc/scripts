@@ -449,12 +449,13 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
     hdataerr = hdata_histdata.totalerr
     hbgs = []
     hsyst = None
-    if len(hbgs) != 0:
+    if len(th2s_bkg) != 0:
         hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
 #    hdataerr.Print("all")
 #    hsyst.Print("all")
-    if len(hbgs) != 0:
-        hsyst = getTotalErrBySqSum(None, [hdataerr, hsyst])
+    if len(th2s_bkg) != 0:
+        if "blind" in options and options["blind"]: hsyst = getTotalErrBySqSum(None, [hsyst])
+        else:                                       hsyst = getTotalErrBySqSum(hdataerr, [hsyst])
 #    hsyst.Print("all")
     hsigs = []
     hsigerrs = []
