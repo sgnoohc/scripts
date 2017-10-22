@@ -13,6 +13,9 @@ from plottery import utils as u
 import math
 import sys
 import uuid
+import os
+sys.path.append("{0}/python-prettytable".format(os.path.realpath(__file__).rsplit("/",1)[0]))
+from prettytable import PrettyTable
 
 ########################################################################
 # New TColors
@@ -256,6 +259,13 @@ def makeBkgHistDatasFromTH2s(th2s, options={}):
     totalerr = getTotalErrBySqSum(None, errs)
     return noms, totalerr
 
+def makeRatioHist(hdata, hbkgs):
+    totalbkg = getTotalBkgHist(hbkgs)
+    ratio = totalbkg.Clone("Ratio")
+    ratio.Reset()
+    ratio.Divide(hdata, hbkgs)
+    return ratio
+
 def getYaxisRange(hist):
     maximum = 0
     if hist:
@@ -288,6 +298,44 @@ def removeErrors(hists):
         for ibin in xrange(0, hist.GetNbinsX()+2):
             hist.SetBinError(ibin, 0)
 
+def yield_str(hist, i, prec=3):
+    formatstr = "{0:.%df} +/- {1:.%df}"%(prec, prec)
+    return formatstr.format(hist.GetBinContent(i), hist.GetBinError(i))
+
+def print_yield_table_from_list(hists, outputname, prec=2):
+    x = PrettyTable()
+    if len(hists) == 0:
+        return
+    # add bin column
+    x.add_column("Bin#", ["Bin{}".format(i) for i in xrange(1, hists[0].GetNbinsX()+1)])
+    for hist in hists:
+        x.add_column(hist.GetName(), [ yield_str(hist, i, prec) for i in xrange(1, hist.GetNbinsX()+1)])
+    fname = outputname
+    fname = os.path.splitext(fname)[0]+'.txt'
+    f = open(fname, "w")
+    f.write(x.get_string())
+    print x
+
+def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
+    hists = []
+    hists.extend(hbkgs)
+    hists.extend(hsigs)
+    htotal = None
+    if len(hbkgs) != 0:
+        htotal = getTotalBkgHist(hbkgs)
+        htotal.SetName("Total")
+        hists.append(htotal)
+    if hdata and len(hbkgs) != 0:
+        hratio = makeRatioHist(hdata, hbkgs)
+        hists.append(htotal)
+        hists.append(hdata)
+        hists.append(hratio)
+    prec = 2
+    if "yield_prec" in options:
+        prec = options["yield_prec"]
+        del options["yield_prec"]
+    print_yield_table_from_list(hists, options["output_name"], prec)
+
 def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], legend_labels=[]):
     hsig_labels = []
     if len(sig_labels) == 0:
@@ -306,12 +354,18 @@ def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], l
         if hsyst.Integral() == 0:
             hsyst = None
     # Setting maximums
-    totalbkg = getTotalBkgHist(hbgs)
+    totalbkg = None
+    if len(hbgs) != 0:
+        totalbkg = getTotalBkgHist(hbgs)
     #totalbkg.Print("all")
     #if len(hsigs) > 0:
     #    hsigs[0].Print("all")
     #for hbg in hbgs:
     #    hbg.Print("all")
+    if "print_yield" in options:
+        if options["print_yield"]:
+            print_yield_table(hdata, hbgs, hsigs, hsyst, options)
+        del options["print_yield"]
     yaxismax = getMaxYaxisRange([hdata, totalbkg]) * 1.8
     removeErrors(hbgs)
     if yaxismax < 0.01:
@@ -393,11 +447,15 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
     hdata_histdata = makeHistDataFromTH2(th2_data, True, options=options)
     hdata = hdata_histdata.nom
     hdataerr = hdata_histdata.totalerr
-    hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
-    hdataerr.Print("all")
-    hsyst.Print("all")
-    hsyst = getTotalErrBySqSum(None, [hdataerr, hsyst])
-    hsyst.Print("all")
+    hbgs = []
+    hsyst = None
+    if len(hbgs) != 0:
+        hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
+#    hdataerr.Print("all")
+#    hsyst.Print("all")
+    if len(hbgs) != 0:
+        hsyst = getTotalErrBySqSum(None, [hdataerr, hsyst])
+#    hsyst.Print("all")
     hsigs = []
     hsigerrs = []
     if len(th2s_sig) > 0:
