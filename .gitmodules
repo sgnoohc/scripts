@@ -1,6 +1,3 @@
 [submodule "syncfiles"]
 	path = syncfiles
 	url = https://github.com/Amarang/syncfiles.git
-[submodule "python-prettytable"]
-	path = python-prettytable
-	url = git@github.com:dprince/python-prettytable.git
