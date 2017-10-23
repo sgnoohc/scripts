@@ -14,9 +14,7 @@ import math
 import sys
 import uuid
 import os
-sys.path.append("{0}/python-prettytable".format(os.path.realpath(__file__).rsplit("/",1)[0]))
 sys.path.append("{0}/syncfiles/pyfiles".format(os.path.realpath(__file__).rsplit("/",1)[0]))
-from prettytable import PrettyTable
 from pytable import *
 
 ########################################################################
