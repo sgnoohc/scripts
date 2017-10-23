@@ -15,7 +15,9 @@ import sys
 import uuid
 import os
 sys.path.append("{0}/python-prettytable".format(os.path.realpath(__file__).rsplit("/",1)[0]))
+sys.path.append("{0}/syncfiles/pyfiles".format(os.path.realpath(__file__).rsplit("/",1)[0]))
 from prettytable import PrettyTable
+from pytable import *
 
 ########################################################################
 # New TColors
@@ -263,7 +265,7 @@ def makeRatioHist(hdata, hbkgs):
     totalbkg = getTotalBkgHist(hbkgs)
     ratio = totalbkg.Clone("Ratio")
     ratio.Reset()
-    ratio.Divide(hdata, hbkgs)
+    ratio.Divide(hdata, totalbkg)
     return ratio
 
 def getYaxisRange(hist):
@@ -303,7 +305,8 @@ def yield_str(hist, i, prec=3):
     return formatstr.format(hist.GetBinContent(i), hist.GetBinError(i))
 
 def print_yield_table_from_list(hists, outputname, prec=2):
-    x = PrettyTable()
+    #x = PrettyTable()
+    x = Table()
     if len(hists) == 0:
         return
     # add bin column
@@ -312,9 +315,10 @@ def print_yield_table_from_list(hists, outputname, prec=2):
         x.add_column(hist.GetName(), [ yield_str(hist, i, prec) for i in xrange(1, hist.GetNbinsX()+1)])
     fname = outputname
     fname = os.path.splitext(fname)[0]+'.txt'
-    f = open(fname, "w")
-    f.write(x.get_string())
-    print x
+    #f = open(fname, "w")
+    #f.write(x.get_string())
+    #print x
+    x.print_table()
 
 def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
     hists = []
