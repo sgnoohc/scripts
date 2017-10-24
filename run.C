@@ -106,7 +106,15 @@ void run( TString scanchainname, const char* input_path, TString treename, TStri
     gROOT->ProcessLine( "std::cout << \"  ..: Start " + scanchainname + " ...\" << std::endl;" );
     gROOT->ProcessLine( "std::cout << std::endl;" );
     gROOT->ProcessLine( "std::cout << std::endl;" );
+    TBenchmark *bmark = new TBenchmark();
+    bmark->Start("benchmark");
     gROOT->ProcessLine( "ScanChain(chain,output_path,sample_name_based_opt_string," + nevents + ");" );
+    bmark->Stop("benchmark");
+    cout << endl;
+    cout << "------------------------------" << endl;
+    cout << "CPU  Time:     " << Form( "%.01f", bmark->GetCpuTime("benchmark")  ) << endl;
+    cout << "Real Time:     " << Form( "%.01f", bmark->GetRealTime("benchmark") ) << endl;
+    delete bmark;
     gROOT->ProcessLine( "std::cout << std::endl;" );
     gROOT->ProcessLine( "std::cout << std::endl;" );
     gROOT->ProcessLine( "std::cout << \"   .\" << std::endl;" );

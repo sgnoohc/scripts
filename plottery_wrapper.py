@@ -16,6 +16,7 @@ import uuid
 import os
 sys.path.append("{0}/syncfiles/pyfiles".format(os.path.realpath(__file__).rsplit("/",1)[0]))
 from pytable import *
+from errors import E
 
 ########################################################################
 # New TColors
@@ -299,11 +300,12 @@ def removeErrors(hists):
             hist.SetBinError(ibin, 0)
 
 def yield_str(hist, i, prec=3):
-    formatstr = "{0:.%df} +/- {1:.%df}"%(prec, prec)
-    return formatstr.format(hist.GetBinContent(i), hist.GetBinError(i))
+    e = E(hist.GetBinContent(i), hist.GetBinError(i))
+    return e.round(prec)
+#    formatstr = "{0:.%df} +/- {1:.%df}"%(prec, prec)
+#    return formatstr.format(hist.GetBinContent(i), hist.GetBinError(i))
 
 def print_yield_table_from_list(hists, outputname, prec=2):
-    #x = PrettyTable()
     x = Table()
     if len(hists) == 0:
         return
@@ -313,10 +315,10 @@ def print_yield_table_from_list(hists, outputname, prec=2):
         x.add_column(hist.GetName(), [ yield_str(hist, i, prec) for i in xrange(1, hist.GetNbinsX()+1)])
     fname = outputname
     fname = os.path.splitext(fname)[0]+'.txt'
-    #f = open(fname, "w")
-    #f.write(x.get_string())
-    #print x
     x.print_table()
+    x.set_theme_basic()
+    f = open(fname, "w")
+    f.write("".join(x.get_table_string()))
 
 def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
     hists = []
