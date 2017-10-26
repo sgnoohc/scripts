@@ -340,6 +340,13 @@ def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
         del options["yield_prec"]
     print_yield_table_from_list(hists, options["output_name"], prec)
 
+def copy_nice_plot_index_php(options):
+    if len(os.environ["ANALYSIS_BASE"]) == 0:
+        return;
+    plotdir = os.path.dirname(options["output_name"])
+    if len(plotdir) == 0: plotdir = "./"
+    os.system("cp {}/scripts/syncfiles/miscfiles/index.php {}/".format(os.environ["ANALYSIS_BASE"], plotdir))
+
 def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], legend_labels=[]):
     hsig_labels = []
     if len(sig_labels) == 0:
@@ -366,6 +373,14 @@ def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], l
     #    hsigs[0].Print("all")
     #for hbg in hbgs:
     #    hbg.Print("all")
+    # If hdata is none clone one hist and fill with 0
+    if not hdata:
+        if len(hbgs) != 0:
+            hdata = hbgs[0].Clone("Data")
+            hdata.Reset()
+        elif len(hsigs) != 0:
+            hdata = hsigs[0].Clone("Data")
+            hdata.Reset()
     if "print_yield" in options:
         if options["print_yield"]:
             print_yield_table(hdata, hbgs, hsigs, hsyst, options)
@@ -390,10 +405,10 @@ def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], l
     if not "canvas_height"            in options: options["canvas_height"]             = 728
     if not "yaxis_range"              in options: options["yaxis_range"]               = [0., yaxismax]
     if not "legend_ncolumns"          in options: options["legend_ncolumns"]           = 2
-    if not "legend_alignment"         in options: options["legend_alignment"]          = "topright"
+    if not "legend_alignment"         in options: options["legend_alignment"]          = "topleft"
     if not "legend_smart"             in options: options["legend_smart"]              = True
-    if not "legend_scalex"            in options: options["legend_scalex"]             = 1.4
-    if not "legend_scaley"            in options: options["legend_scaley"]             = 1.4
+    if not "legend_scalex"            in options: options["legend_scalex"]             = 1.2
+    if not "legend_scaley"            in options: options["legend_scaley"]             = 1.2
     if not "legend_border"            in options: options["legend_border"]             = False
     if not "legend_percentageinbox"   in options: options["legend_percentageinbox"]    = False
     if not "hist_line_none"           in options: options["hist_line_none"]            = True
@@ -441,6 +456,8 @@ def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], l
             legend_labels = hlegend_labels,
             options       = options
             )
+    os.system("chmod 644 {}".format(options["output_name"]))
+    copy_nice_plot_index_php(options)
 
 def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], legend_labels=[]):
     """
