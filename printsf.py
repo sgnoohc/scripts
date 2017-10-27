@@ -4,10 +4,13 @@ import os
 import sys
 import ROOT as r
 
+
 def printsf(funcname, th2, filename=""):
-    f = None
-    if len(filename) != 0:
-        f = open(filename, "w")
+    """
+    Function to print scale factors (or fake rate) from TH2
+    """
+
+    # Form the function sring
     funcstr = ""
     funcstr += "float {}(float pt, float eta, int isyst=0)\n".format(funcname)
     funcstr += "{\n"
@@ -22,7 +25,10 @@ def printsf(funcname, th2, filename=""):
             funcstr += "    if (pt < {} && fabs(eta) < {}) return {} + isyst * {};\n".format(ptthresh, etathresh, sf, err)
     funcstr += "    return 1;\n"
     funcstr += "}\n"
-    if f:
+
+    # print or write to file
+    if len(filename) != 0:
+        f = open(filename, "w")
         f.write(funcstr)
     else:
         print funcstr
