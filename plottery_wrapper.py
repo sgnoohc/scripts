@@ -18,9 +18,9 @@ sys.path.append("{0}/syncfiles/pyfiles".format(os.path.realpath(__file__).rsplit
 from pytable import *
 from errors import E
 
-########################################################################
+# ================================================================
 # New TColors
-########################################################################
+# ================================================================
 mycolors = []
 mycolors.append(r.TColor(11005 , 103 / 255. , 0   / 255. , 31  / 255.))
 mycolors.append(r.TColor(11004 , 178 / 255. , 24  / 255. , 43  / 255.))
@@ -78,6 +78,320 @@ mycolors.append(r.TColor(2009 , 55  / 255. , 65  / 255. , 100 / 255.)) #dark vio
 mycolors.append(r.TColor(2010 , 120 / 255. , 160 / 255. , 0   / 255.)) #light green
 mycolors.append(r.TColor(2011 , 0   / 255. , 158 / 255. , 115 / 255.)) #green
 mycolors.append(r.TColor(2012 , 204 / 255. , 121 / 255. , 167 / 255.)) #pink?
+
+
+
+
+# ===============
+# Histogram utils
+# ===============
+
+#______________________________________________________________________________________________________________________
+def cloneTH1(obj, name=""):
+    """
+    Clone any TH1 object with the same name or new name.
+    """
+    if name == "":
+        name = obj.GetName()
+    rtn = obj.Clone(name)
+    rtn.SetTitle("")
+    if not rtn.GetSumw2N():
+        rtn.Sumw2()
+    rtn.SetDirectory(0)
+    # https://root-forum.cern.ch/t/setbinlabel-causes-unexpected-behavior-when-handling-the-histograms/26202/2
+    labels = rtn.GetXaxis().GetLabels()
+    if labels:
+        rtn.GetXaxis().SetRange(1, rtn.GetXaxis().GetNbins())
+    return rtn;
+
+#______________________________________________________________________________________________________________________
+def get_total_hist(hists):
+    """
+    Sum all histograms and return a new copy of total bkg hist.
+    """
+    if len(hists) == 0:
+        print "ERROR - the number of histograms are zero, while you asked me to sum them up."
+    totalhist = cloneTH1(hists[0])
+    totalhist.Reset()
+    for hist in hists:
+        totalhist.Add(hist)
+    return totalhist
+
+#______________________________________________________________________________________________________________________
+def get_total_err_hist(hists):
+    """
+    Sum all histograms errors
+    """
+    if len(hists) == 0:
+        print "ERROR - the number of histograms are zero, while you asked me to sum them up."
+    totalhist = get_total_hist(hists)
+    errhist = cloneTH1(totalhist)
+    errhist.Reset()
+    for i in xrange(0, totalhist.GetNbinsX() + 2):
+        errhist.SetBinContent(i, totalhist.GetBinError(i))
+    return errhist
+
+#______________________________________________________________________________________________________________________
+def get_max_yaxis_range(hists):
+    maximum = 0
+    for hist in hists:
+        v = getYaxisRange(hist)
+        if v > maximum:
+            maximum = v
+    return maximum
+
+#______________________________________________________________________________________________________________________
+def remove_errors(hists):
+    for hist in hists:
+        for ibin in xrange(0, hist.GetNbinsX()+2):
+            hist.SetBinError(ibin, 0)
+
+
+
+
+
+
+# ====================
+# Yield table printing
+# ====================
+
+#______________________________________________________________________________________________________________________
+def yield_str(hist, i, prec=3):
+    e = E(hist.GetBinContent(i), hist.GetBinError(i))
+    return e.round(prec)
+
+#______________________________________________________________________________________________________________________
+def print_yield_table_from_list(hists, outputname, prec=2):
+    x = Table()
+    if len(hists) == 0:
+        return
+    # add bin column
+    x.add_column("Bin#", ["Bin{}".format(i) for i in xrange(1, hists[0].GetNbinsX()+1)])
+    for hist in hists:
+        x.add_column(hist.GetName(), [ yield_str(hist, i, prec) for i in xrange(1, hist.GetNbinsX()+1)])
+    fname = outputname
+    fname = os.path.splitext(fname)[0]+'.txt'
+    x.print_table()
+    x.set_theme_basic()
+    f = open(fname, "w")
+    f.write("".join(x.get_table_string()))
+
+#______________________________________________________________________________________________________________________
+def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
+    hists = []
+    hists.extend(hbkgs)
+    hists.extend(hsigs)
+    htotal = None
+    if len(hbkgs) != 0:
+        htotal = get_total_hist(hbkgs)
+        htotal.SetName("Total")
+        hists.append(htotal)
+    if hdata and len(hbkgs) != 0:
+        hratio = makeRatioHist(hdata, hbkgs)
+        #hists.append(htotal)
+        hists.append(hdata)
+        hists.append(hratio)
+    prec = 2
+    if "yield_prec" in options:
+        prec = options["yield_prec"]
+        del options["yield_prec"]
+    print_yield_table_from_list(hists, options["output_name"], prec)
+
+def copy_nice_plot_index_php(options):
+    if len(os.environ["ANALYSIS_BASE"]) == 0:
+        return;
+    plotdir = os.path.dirname(options["output_name"])
+    if len(plotdir) == 0: plotdir = "./"
+    os.system("cp {}/scripts/syncfiles/miscfiles/index.php {}/".format(os.environ["ANALYSIS_BASE"], plotdir))
+
+
+
+# ====================
+# The plottery wrapper
+# ====================
+
+#______________________________________________________________________________________________________________________
+def plot_hist_1d(hdata=None, hbkgs=[], hsigs=[], hsyst=None, options={}, colors=[], sig_labels=[], legend_labels=[]):
+    """
+    Wrapper function to call Plottery.
+    """
+
+    # Sanity check. If no histograms exit
+    if not hdata and len(hbkgs) == 0 and len(hsigs) == 0:
+        print "[plottery_wrapper] >>> Nothing to do!"
+        return
+
+    # If a blind option is set, blind the data histogram to None
+    # The later step will set the histogram of data to all zero
+    if "blind" in options:
+        if options["blind"]:
+            hdata = None
+        del options["blind"]
+
+    # If hdata is none clone one hist and fill with 0
+    if not hdata:
+        if len(hbkgs) != 0:
+            hdata = hbkgs[0].Clone("Data")
+            hdata.Reset()
+        elif len(hsigs) != 0:
+            hdata = hsigs[0].Clone("Data")
+            hdata.Reset()
+
+    # Compute some arguments that are missing (viz. colors, sig_labels, legend_labels)
+    hsig_labels = []
+    if len(sig_labels) == 0:
+        for hsig in hsigs:
+            hsig_labels.append(hsig.GetName())
+    hcolors = colors
+    if len(colors) == 0:
+        for index, hbg in enumerate(hbkgs):
+            hcolors.append(2001 + index)
+    hlegend_labels = []
+    if len(legend_labels) == 0:
+        for hbg in hbkgs:
+            hlegend_labels.append(hbg.GetName())
+
+    # Set maximum of the plot
+    totalbkg = None
+    if len(hbkgs) != 0:
+        totalbkg = get_total_hist(hbkgs)
+    yaxismax = get_max_yaxis_range([hdata, totalbkg]) * 1.8
+
+    # Once maximum is computed, set the y-axis label location
+    if yaxismax < 0.01:
+        options["yaxis_title_offset"] = 1.8
+    elif yaxismax < 0.1:
+        options["yaxis_title_offset"] = 1.6
+    elif yaxismax < 1.:
+        options["yaxis_title_offset"] = 1.5
+    elif yaxismax < 100:
+        options["yaxis_title_offset"] = 1.2
+    elif yaxismax < 1000:
+        options["yaxis_title_offset"] = 1.45
+    elif yaxismax < 10000:
+        options["yaxis_title_offset"] = 1.6
+    else:
+        options["yaxis_title_offset"] = 1.8
+
+    # Print histogram content for debugging
+    #totalbkg.Print("all")
+    #if len(hsigs) > 0:
+    #    hsigs[0].Print("all")
+    #for hbg in hbkgs:
+    #    hbg.Print("all")
+
+    # Print yield table if the option is turned on
+    if "print_yield" in options:
+        if options["print_yield"]:
+            print_yield_table(hdata, hbkgs, hsigs, hsyst, options)
+        del options["print_yield"]
+
+    # Inject signal option
+    if "inject_signal" in options:
+        if options["inject_signal"]:
+            if len(hsigs) > 0:
+                hdata = hsigs[0].Clone("test")
+                hdata.Reset()
+                for hsig in hsigs:
+                    hdata.Add(hsig)
+                for hbkg in hbkgs:
+                    hdata.Add(hbkg)
+                for i in xrange(1, hdata.GetNbinsX() + 1):
+                    hdata.SetBinError(i, 0)
+                options["legend_datalabel"] = "Sig+Bkg"
+        del options["inject_signal"]
+
+    # If hsyst is not provided, compute one yourself from the bkg histograms
+    if not hsyst:
+        hsyst = get_total_err_hist(hbkgs)
+
+    # The uncertainties are all accounted in the hsyst so remove all errors from bkgs
+    remove_errors(hbkgs)
+
+    # Here are my default options for plottery
+    if not "canvas_width"             in options: options["canvas_width"]              = 604
+    if not "canvas_height"            in options: options["canvas_height"]             = 728
+    if not "yaxis_range"              in options: options["yaxis_range"]               = [0., yaxismax]
+    if not "legend_ncolumns"          in options: options["legend_ncolumns"]           = 2
+    if not "legend_alignment"         in options: options["legend_alignment"]          = "topleft"
+    if not "legend_smart"             in options: options["legend_smart"]              = True
+    if not "legend_scalex"            in options: options["legend_scalex"]             = 1.2
+    if not "legend_scaley"            in options: options["legend_scaley"]             = 1.2
+    if not "legend_border"            in options: options["legend_border"]             = False
+    if not "legend_percentageinbox"   in options: options["legend_percentageinbox"]    = False
+    if not "hist_line_none"           in options: options["hist_line_none"]            = True
+    if not "show_bkg_errors"          in options: options["show_bkg_errors"]           = False
+    if not "ratio_range"              in options: options["ratio_range"]               = [0.7, 1.3]
+    if not "ratio_name_size"          in options: options["ratio_name_size"]           = 0.13
+    if not "ratio_name_offset"        in options: options["ratio_name_offset"]         = 0.6
+    if not "ratio_xaxis_label_offset" in options: options["ratio_xaxis_label_offset"]  = 0.06
+    if not "ratio_yaxis_label_offset" in options: options["ratio_yaxis_label_offset"]  = 0.03
+    if not "ratio_xaxis_title_offset" in options: options["ratio_xaxis_title_offset"]  = 1.40
+    if not "ratio_xaxis_title_size"   in options: options["ratio_xaxis_title_size"]    = 0.13
+    if not "ratio_label_size"         in options: options["ratio_label_size"]          = 0.13
+    if not "canvas_tick_one_side"     in options: options["canvas_tick_one_side"]      = True
+    if not "canvas_main_y1"           in options: options["canvas_main_y1"]            = 0.2
+    if not "canvas_main_topmargin"    in options: options["canvas_main_topmargin"]     = 0.2 / 0.7 - 0.2
+    if not "canvas_main_rightmargin"  in options: options["canvas_main_rightmargin"]   = 50. / 600.
+    if not "canvas_main_bottommargin" in options: options["canvas_main_bottommargin"]  = 0.2
+    if not "canvas_main_leftmargin"   in options: options["canvas_main_leftmargin"]    = 130. / 600.
+    if not "canvas_ratio_y2"          in options: options["canvas_ratio_y2"]           = 0.342
+    if not "canvas_ratio_topmargin"   in options: options["canvas_ratio_topmargin"]    = 0.05
+    if not "canvas_ratio_rightmargin" in options: options["canvas_ratio_rightmargin"]  = 50. / 600.
+    if not "canvas_ratio_bottommargin"in options: options["canvas_ratio_bottommargin"] = 0.4
+    if not "canvas_ratio_leftmargin"  in options: options["canvas_ratio_leftmargin"]   = 130. / 600.
+    if not "xaxis_title_size"         in options: options["xaxis_title_size"]          = 0.06
+    if not "yaxis_title_size"         in options: options["yaxis_title_size"]          = 0.06
+    if not "xaxis_label_size_scale"   in options: options["xaxis_label_size_scale"]    = 1.4
+    if not "yaxis_label_size_scale"   in options: options["yaxis_label_size_scale"]    = 1.4
+    if not "xaxis_label_offset_scale" in options: options["xaxis_label_offset_scale"]  = 4.0
+    if not "yaxis_label_offset_scale" in options: options["yaxis_label_offset_scale"]  = 4.0
+    if not "xaxis_tick_length_scale"  in options: options["xaxis_tick_length_scale"]   = -0.8
+    if not "yaxis_tick_length_scale"  in options: options["yaxis_tick_length_scale"]   = -0.8
+    if not "ratio_tick_length_scale"  in options: options["ratio_tick_length_scale"]   = -1.0
+    if not "output_name"              in options: options["output_name"]               = "plot.png"
+    if not "cms_label"                in options: options["cms_label"]                 = "Preliminary"
+    if not "lumi_value"               in options: options["lumi_value"]                = "35.9"
+    if not "bkg_err_fill_style"       in options: options["bkg_err_fill_style"]        = 3245
+    if not "bkg_err_fill_color"       in options: options["bkg_err_fill_color"]        = 1
+
+    # Call Plottery! I hope you win the Lottery!
+    p.plot_hist(
+            data          = hdata,
+            bgs           = hbkgs,
+            sigs          = hsigs,
+            syst          = hsyst,
+            sig_labels    = hsig_labels,
+            colors        = hcolors,
+            legend_labels = hlegend_labels,
+            options       = options
+            )
+
+    # Set permission
+    os.system("chmod 644 {}".format(options["output_name"]))
+
+    # Call nice plots
+    copy_nice_plot_index_php(options)
+
+
+
+
+
+
+
+
+
+# ------------===============------------===============------------===============------------===============------------===============------------===============
+# ------------===============------------===============------------===============------------===============------------===============------------===============
+# ------------===============------------===============------------===============------------===============------------===============------------===============
+# ------------===============------------===============------------===============------------===============------------===============------------===============
+
+
+# Below are all deprecated for now
+
+
+
+
 
 class HistData:
     """
@@ -180,18 +494,6 @@ def getTotalErrFromSystLists(nom, upsysts, dnsysts, normfracsyst=0):
         systs.append(getTotalErrByMaxDiff(nom, [pair[0], pair[1]]))
     return getTotalErrBySqSum(nom, systs, normfracsyst)
 
-def getTotalBkgHist(hists):
-    """
-    Sum all histograms and return a new copy of total bkg hist.
-    """
-    if len(hists) == 0:
-        print "ERROR - the number of histograms are zero, while you asked me to sum them up."
-    totalhist = cloneTH1(hists[0])
-    totalhist.Reset()
-    for hist in hists:
-        totalhist.Add(hist)
-    return totalhist
-
 def makeHistDataFromTH2(th2, dosyst=True, options={}):
     """
     Creates an instance of "HistData" class from a single TH2.
@@ -248,7 +550,7 @@ def makeHistDatasFromTH2s(th2s, options={}):
         hist = makeHistDataFromTH2(th2, options=options)
         noms.append(hist.nom)
         errs.append(hist.totalerr)
-    totalerr = getTotalErrBySqSum(getTotalBkgHist(noms), errs)
+    totalerr = getTotalErrBySqSum(get_total_hist(noms), errs)
     return noms, errs
 
 def makeBkgHistDatasFromTH2s(th2s, options={}):
@@ -261,7 +563,7 @@ def makeBkgHistDatasFromTH2s(th2s, options={}):
     return noms, totalerr
 
 def makeRatioHist(hdata, hbkgs):
-    totalbkg = getTotalBkgHist(hbkgs)
+    totalbkg = get_total_hist(hbkgs)
     ratio = totalbkg.Clone("Ratio")
     ratio.Reset()
     ratio.Divide(hdata, totalbkg)
@@ -279,14 +581,6 @@ def getYaxisRange(hist):
 
     return maximum
 
-def getMaxYaxisRange(hists):
-    maximum = 0
-    for hist in hists:
-        v = getYaxisRange(hist)
-        if v > maximum:
-            maximum = v
-    return maximum
-
 def rebin(hists, nbin):
     for hist in hists:
         if not hist: continue
@@ -294,170 +588,6 @@ def rebin(hists, nbin):
         fac = currnbin / nbin
         hist.Rebin(fac)
 
-def removeErrors(hists):
-    for hist in hists:
-        for ibin in xrange(0, hist.GetNbinsX()+2):
-            hist.SetBinError(ibin, 0)
-
-def yield_str(hist, i, prec=3):
-    e = E(hist.GetBinContent(i), hist.GetBinError(i))
-    return e.round(prec)
-#    formatstr = "{0:.%df} +/- {1:.%df}"%(prec, prec)
-#    return formatstr.format(hist.GetBinContent(i), hist.GetBinError(i))
-
-def print_yield_table_from_list(hists, outputname, prec=2):
-    x = Table()
-    if len(hists) == 0:
-        return
-    # add bin column
-    x.add_column("Bin#", ["Bin{}".format(i) for i in xrange(1, hists[0].GetNbinsX()+1)])
-    for hist in hists:
-        x.add_column(hist.GetName(), [ yield_str(hist, i, prec) for i in xrange(1, hist.GetNbinsX()+1)])
-    fname = outputname
-    fname = os.path.splitext(fname)[0]+'.txt'
-    x.print_table()
-    x.set_theme_basic()
-    f = open(fname, "w")
-    f.write("".join(x.get_table_string()))
-
-def print_yield_table(hdata, hbkgs, hsigs, hsyst, options):
-    hists = []
-    hists.extend(hbkgs)
-    hists.extend(hsigs)
-    htotal = None
-    if len(hbkgs) != 0:
-        htotal = getTotalBkgHist(hbkgs)
-        htotal.SetName("Total")
-        hists.append(htotal)
-    if hdata and len(hbkgs) != 0:
-        hratio = makeRatioHist(hdata, hbkgs)
-        hists.append(htotal)
-        hists.append(hdata)
-        hists.append(hratio)
-    prec = 2
-    if "yield_prec" in options:
-        prec = options["yield_prec"]
-        del options["yield_prec"]
-    print_yield_table_from_list(hists, options["output_name"], prec)
-
-def copy_nice_plot_index_php(options):
-    if len(os.environ["ANALYSIS_BASE"]) == 0:
-        return;
-    plotdir = os.path.dirname(options["output_name"])
-    if len(plotdir) == 0: plotdir = "./"
-    os.system("cp {}/scripts/syncfiles/miscfiles/index.php {}/".format(os.environ["ANALYSIS_BASE"], plotdir))
-
-def plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors=[], sig_labels=[], legend_labels=[]):
-    hsig_labels = []
-    if len(sig_labels) == 0:
-        for hsig in hsigs:
-            hsig_labels.append(hsig.GetName())
-    hcolors = colors
-    if len(colors) == 0:
-        for index, hbg in enumerate(hbgs):
-            hcolors.append(2001 + index)
-    hlegend_labels = []
-    if len(legend_labels) == 0:
-        for hbg in hbgs:
-            hlegend_labels.append(hbg.GetName())
-    # If hsyst has integral of 0 remove it
-    if hsyst:
-        if hsyst.Integral() == 0:
-            hsyst = None
-    # Setting maximums
-    totalbkg = None
-    if len(hbgs) != 0:
-        totalbkg = getTotalBkgHist(hbgs)
-    #totalbkg.Print("all")
-    #if len(hsigs) > 0:
-    #    hsigs[0].Print("all")
-    #for hbg in hbgs:
-    #    hbg.Print("all")
-    # If hdata is none clone one hist and fill with 0
-    if not hdata:
-        if len(hbgs) != 0:
-            hdata = hbgs[0].Clone("Data")
-            hdata.Reset()
-        elif len(hsigs) != 0:
-            hdata = hsigs[0].Clone("Data")
-            hdata.Reset()
-    if "print_yield" in options:
-        if options["print_yield"]:
-            print_yield_table(hdata, hbgs, hsigs, hsyst, options)
-        del options["print_yield"]
-    yaxismax = getMaxYaxisRange([hdata, totalbkg]) * 1.8
-    removeErrors(hbgs)
-    if yaxismax < 0.01:
-        options["yaxis_title_offset"] = 1.8
-    elif yaxismax < 0.1:
-        options["yaxis_title_offset"] = 1.6
-    elif yaxismax < 1.:
-        options["yaxis_title_offset"] = 1.5
-    elif yaxismax < 100:
-        options["yaxis_title_offset"] = 1.2
-    elif yaxismax < 1000:
-        options["yaxis_title_offset"] = 1.45
-    elif yaxismax < 10000:
-        options["yaxis_title_offset"] = 1.6
-    else:
-        options["yaxis_title_offset"] = 1.8
-    if not "canvas_width"             in options: options["canvas_width"]              = 604
-    if not "canvas_height"            in options: options["canvas_height"]             = 728
-    if not "yaxis_range"              in options: options["yaxis_range"]               = [0., yaxismax]
-    if not "legend_ncolumns"          in options: options["legend_ncolumns"]           = 2
-    if not "legend_alignment"         in options: options["legend_alignment"]          = "topleft"
-    if not "legend_smart"             in options: options["legend_smart"]              = True
-    if not "legend_scalex"            in options: options["legend_scalex"]             = 1.2
-    if not "legend_scaley"            in options: options["legend_scaley"]             = 1.2
-    if not "legend_border"            in options: options["legend_border"]             = False
-    if not "legend_percentageinbox"   in options: options["legend_percentageinbox"]    = False
-    if not "hist_line_none"           in options: options["hist_line_none"]            = True
-    if not "show_bkg_errors"          in options: options["show_bkg_errors"]           = False
-    if not "ratio_range"              in options: options["ratio_range"]               = [0.7, 1.3]
-    if not "ratio_name_size"          in options: options["ratio_name_size"]           = 0.13
-    if not "ratio_name_offset"        in options: options["ratio_name_offset"]         = 0.6
-    if not "ratio_xaxis_label_offset" in options: options["ratio_xaxis_label_offset"]  = 0.06
-    if not "ratio_yaxis_label_offset" in options: options["ratio_yaxis_label_offset"]  = 0.03
-    if not "ratio_xaxis_title_offset" in options: options["ratio_xaxis_title_offset"]  = 1.40
-    if not "ratio_xaxis_title_size"   in options: options["ratio_xaxis_title_size"]    = 0.13
-    if not "ratio_label_size"         in options: options["ratio_label_size"]          = 0.13
-    if not "canvas_tick_one_side"     in options: options["canvas_tick_one_side"]      = True
-    if not "canvas_main_y1"           in options: options["canvas_main_y1"]            = 0.2
-    if not "canvas_main_topmargin"    in options: options["canvas_main_topmargin"]     = 0.2 / 0.7 - 0.2
-    if not "canvas_main_rightmargin"  in options: options["canvas_main_rightmargin"]   = 50. / 600.
-    if not "canvas_main_bottommargin" in options: options["canvas_main_bottommargin"]  = 0.2
-    if not "canvas_main_leftmargin"   in options: options["canvas_main_leftmargin"]    = 130. / 600.
-    if not "canvas_ratio_y2"          in options: options["canvas_ratio_y2"]           = 0.342
-    if not "canvas_ratio_topmargin"   in options: options["canvas_ratio_topmargin"]    = 0.05
-    if not "canvas_ratio_rightmargin" in options: options["canvas_ratio_rightmargin"]  = 50. / 600.
-    if not "canvas_ratio_bottommargin"in options: options["canvas_ratio_bottommargin"] = 0.4
-    if not "canvas_ratio_leftmargin"  in options: options["canvas_ratio_leftmargin"]   = 130. / 600.
-    if not "xaxis_title_size"         in options: options["xaxis_title_size"]          = 0.06
-    if not "yaxis_title_size"         in options: options["yaxis_title_size"]          = 0.06
-    if not "xaxis_label_size_scale"   in options: options["xaxis_label_size_scale"]    = 1.4
-    if not "yaxis_label_size_scale"   in options: options["yaxis_label_size_scale"]    = 1.4
-    if not "xaxis_label_offset_scale" in options: options["xaxis_label_offset_scale"]  = 4.0
-    if not "yaxis_label_offset_scale" in options: options["yaxis_label_offset_scale"]  = 4.0
-    if not "xaxis_tick_length_scale"  in options: options["xaxis_tick_length_scale"]   = -0.8
-    if not "yaxis_tick_length_scale"  in options: options["yaxis_tick_length_scale"]   = -0.8
-    if not "ratio_tick_length_scale"  in options: options["ratio_tick_length_scale"]   = -1.0
-    if not "output_name"              in options: options["output_name"]               = "plot.png"
-    if not "cms_label"                in options: options["cms_label"]                 = "Preliminary"
-    if not "lumi_value"               in options: options["lumi_value"]                = "35.9"
-    if not "bkg_err_fill_style"       in options: options["bkg_err_fill_style"]        = 3245
-    if not "bkg_err_fill_color"       in options: options["bkg_err_fill_color"]        = 1
-    p.plot_hist(
-            data          = hdata,
-            bgs           = hbgs,
-            sigs          = hsigs,
-            syst          = hsyst,
-            sig_labels    = hsig_labels,
-            colors        = hcolors,
-            legend_labels = hlegend_labels,
-            options       = options
-            )
-    os.system("chmod 644 {}".format(options["output_name"]))
-    copy_nice_plot_index_php(options)
 
 def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], legend_labels=[]):
     """
@@ -472,19 +602,24 @@ def plot_hist(th2_data, th2s_bkg, th2s_sig, options, colors=[], sig_labels=[], l
     hsyst = None
     if len(th2s_bkg) != 0:
         hbgs, hsyst = makeBkgHistDatasFromTH2s(th2s_bkg, options=options)
+        hsyst.Print("all")
 #    hdataerr.Print("all")
 #    hsyst.Print("all")
     if len(th2s_bkg) != 0:
-        if "blind" in options and options["blind"]: hsyst = getTotalErrBySqSum(None, [hsyst])
-        else:                                       hsyst = getTotalErrBySqSum(hdataerr, [hsyst])
+        hsyst = getTotalErrBySqSum(None, [hsyst])
+        #if "blind" in options and options["blind"]: hsyst = getTotalErrBySqSum(None, [hsyst])
+        #else:                                       hsyst = getTotalErrBySqSum(hdataerr, [hsyst])
 #    hsyst.Print("all")
     hsigs = []
     hsigerrs = []
     if len(th2s_sig) > 0:
         hsigs, hsigerrs = makeHistDatasFromTH2s(th2s_sig, options=options)
     # Rebinning occurs during "makeHist" delete the option afterwards
-    if "blind" in options: hdata = None
-    if "nbin" in options: del options["nbin"]
-    if "blind" in options: del options["blind"]
+    if "nbin" in options:
+        del options["nbin"]
+    if "blind" in options:
+        if options["blind"]:
+            hdata = None
+        del options["blind"]
     plot_hist_1d(hdata, hbgs, hsigs, hsyst, options, colors, sig_labels, legend_labels)
 
