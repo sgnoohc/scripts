@@ -24,7 +24,15 @@ def printsf(funcname, xthreshs, ythreshs, sfs, errs, filename="", xvar="eta", yv
         for j, ythresh in enumerate(ythreshs):
             sf = sfs[i][j]
             err = errs[i][j]
-            funcstr += "    if ({}({}) < {} && {}({}) < {}) return {} + isyst * {};\n".format(yvarabsstr, yvar, ythresh, xvarabsstr, xvar, xthresh, sf, err)
+            if i == len(xthreshs) - 1 and j == len(ythreshs):
+                funcstr += "    return {} + isyst * {};\n".format(yvarabsstr, yvar, ythresh, xvarabsstr, xvar, xthresh, sf, err)
+            elif i == len(xthreshs) -1:
+                funcstr += "    if ({}({}) < {}) return {} + isyst * {};\n".format(yvarabsstr, yvar, ythresh, sf, err)
+            #elif j == len(ythreshs) -1:
+            #    funcstr += "    if ({}({}) < {}) return {} + isyst * {};\n".format(yvarabsstr, yvar, ythresh, sf, err)
+            else:
+                funcstr += "    if ({}({}) < {} && {}({}) < {}) return {} + isyst * {};\n".format(yvarabsstr, yvar, ythresh, xvarabsstr, xvar, xthresh, sf, err)
+    funcstr += "    printf(\"WARNING in {}(): the given phase-space (%f, %f) did not fall under any range!\\n\", {}, {}); \n".format(funcname, yvar, xvar)
     funcstr += "    return 1;\n"
     funcstr += "}\n"
 
